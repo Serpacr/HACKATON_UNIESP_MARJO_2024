@@ -1,0 +1,136 @@
+#Sign-up endpoint:
+java
+
+@PostMapping("/signup")
+public ResponseEntity<String> signup(@RequestBody User user) {
+    // Validate user input (e.g., email, password, CPF)
+    if (!validateCPF(user.getCpf())) {
+        return ResponseEntity.badRequest().body("Invalid CPF");
+    }
+    // Create a new user in the database
+    userRepository.save(user);
+    return ResponseEntity.ok("User created successfully");
+}
+
+#Sign-in endpoint:
+java
+
+@PostMapping("/signin")
+public ResponseEntity<String> signin(@RequestBody User user) {
+    // Authenticate user credentials (e.g., email, password)
+    User authenticatedUser = userRepository.findByEmailAndPassword(user.getEmail(), user.getPassword());
+    if (authenticatedUser == null) {
+        return ResponseEntity.badRequest().body("Invalid credentials");
+    }
+    // Generate a JWT token or session ID
+    String token = generateToken(authenticatedUser);
+    return ResponseEntity.ok(token);
+}
+
+#CPF Validation
+java
+
+private boolean validateCPF(String cpf) {
+    String govApiUrl = "https://gov-api.com.br/validate-cpf";
+    HttpResponse<String> response = Unirest.get(govApiUrl)
+            .queryString("cpf", cpf)
+            .asString();
+    if (response.getStatus() == 200) {
+        // Parse the response to check if the CPF is valid
+        JSONObject jsonResponse = new JSONObject(response.getBody());
+        return jsonResponse.getBoolean("isValid");
+    } else {
+        return false;
+    }
+}
+
+#Frontend
+jsx
+
+Sign-up component:
+
+import React, { useState } from 'react';
+
+const Signup = () => {
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [cpf, setCpf] = useState('');
+    const [error, setError] = useState(null);
+
+    const handleSubmit = async (event) => {
+        event.preventDefault();
+        try {
+            const response = await fetch('/signup', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password, cpf }),
+            });
+            if (response.ok) {
+                // User created successfully, redirect to sign-in page
+                window.location.href = '/signin';
+            } else {
+                setError('Invalid CPF or user creation failed');
+            }
+        } catch (error) {
+            setError('Error creating user');
+        }
+    };
+
+    return (
+        <form onSubmit={handleSubmit}>
+            <label>Email:</label>
+            <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} />
+            <br />
+            <label>Password:</label>
+            <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} />
+            <br />
+            <label>CPF:</label>
+            <input type="text" value={cpf} onChange={(event) => setCpf(event.target.value)} />
+            <br />
+            {error && <div style={{ color: 'red' }}>{error}</div>}
+            <button type="submit">Sign up</button>
+        </form>
+    );
+};
+
+export default Signup;
+
+#Sign-in component:
+
+jsx
+
+import React, { useState } from 'react';
+
+const Signin = () => {
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [error, setError] = useState(null);
+
+    const handleSubmit = async (event) => {
+        event.preventDefault();
+        try {
+            const response = await fetch('/signin', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password }),
+            });
+            if (response.ok) {
+                // User authenticated successfully, redirect to app page
+                window.location.href = '/app';
+            } else {
+                setError('Invalid credentials');
+            }
+        } catch (error) {
+            setError('Error authenticating user');
+        }
+    };
+
+    return (
+        <form onSubmit={handleSubmit}>
+            <label>Email:</label>
+            <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} />
+            <br />
+            <label>Password:</label>
+            <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} />
+            <br />
+            {error && <div style={{ color: 'red' }}>{
